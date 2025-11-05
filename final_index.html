@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎵 LinkedBeats — Multi-Author Playlist Visualizer</title>
+<style>
+  :root{
+    --bg:#0b0f1a;
+    --panel:#111827;
+    --accent:#22d3ee;
+    --accent2:#34d399;
+    --muted:#94a3b8;
+  }
+  body{
+    margin:0;
+    background:linear-gradient(180deg,#030712 0%,#111827 100%);
+    color:#e5e7eb;
+    font-family:Inter,system-ui;
+  }
+  .app{max-width:1100px;margin:30px auto;padding:20px;}
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
+  h1{color:var(--accent);font-size:22px;margin:0;}
+  .controls{background:var(--panel);padding:14px;border-radius:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
+  input{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);padding:8px 10px;border-radius:8px;color:white;}
+  button{background:linear-gradient(90deg,var(--accent),#0891b2);border:none;color:white;padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:600;}
+  button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.2);color:var(--muted);}
+  button.danger{background:linear-gradient(90deg,#ef4444,#dc2626);}
+  .visuals{margin-top:25px;}
+  .author-block{margin-bottom:30px;}
+  .author-name{font-size:18px;font-weight:600;color:var(--accent2);margin-bottom:8px;}
+  .nodes{display:flex;align-items:center;gap:24px;flex-wrap:wrap;}
+  .node{background:#1e293b;padding:10px 16px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);box-shadow:0 4px 10px rgba(0,0,0,0.4);transition:transform 0.3s, box-shadow 0.3s;}
+  .node.playing{background:linear-gradient(90deg,var(--accent2),#10b981);color:black;transform:scale(1.1);box-shadow:0 0 20px rgba(34,211,238,0.6);}
+  .arrow{color:var(--muted);}
+  .panel{background:var(--panel);border-radius:10px;padding:12px;margin-top:15px;}
+  .log p{margin:4px 0;font-size:13px;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🎧 LinkedBeats — Multi-Author Playlist Visualizer</h1>
+    <div style="color:var(--muted)">Scenario: Hashing + Linked List Music Player</div>
+  </header>
+
+  <div class="controls">
+    <input id="songInput" type="text" placeholder="🎵 Song name">
+    <input id="authorInput" type="text" placeholder="✍️ Author name">
+    <button id="addBtn">Add Song</button>
+    <button id="playAuthorBtn">▶ Play Author</button>
+    <button id="playAllBtn">🎶 Play All</button>
+    <button id="resetBtn" class="ghost">🌀 Reset</button>
+  </div>
+
+  <div class="visuals" id="visuals"></div>
+
+  <div class="panel">
+    <h3 style="color:var(--accent)">🧾 Action Log</h3>
+    <div id="log" class="log"></div>
+  </div>
+</div>
+
+<script>
+class Node{
+  constructor(val){this.val=val;this.next=null;}
+}
+class LinkedList{
+  constructor(){this.head=null;}
+  insertTail(val){
+    const n=new Node(val);
+    if(!this.head){this.head=n;return;}
+    let c=this.head;while(c.next)c=c.next;
+    c.next=n;
+  }
+  toArray(){
+    const arr=[];let c=this.head;while(c){arr.push(c.val);c=c.next;}return arr;
+  }
+}
+const hashTable={}; // author -> LinkedList
+const visuals=document.getElementById("visuals");
+const logEl=document.getElementById("log");
+const log=msg=>{const p=document.createElement('p');p.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;logEl.prepend(p);};
+
+// render all linked lists
+function renderVisuals(){
+  visuals.innerHTML="";
+  for(const author in hashTable){
+    const list=hashTable[author].toArray();
+    const block=document.createElement("div");
+    block.className="author-block";
+    const name=document.createElement("div");
+    name.className="author-name";
+    name.textContent=`🎼 ${author}`;
+    block.appendChild(name);
+    const nodeWrap=document.createElement("div");
+    nodeWrap.className="nodes";
+    list.forEach((song,i)=>{
+      const node=document.createElement("div");
+      node.className="node";
+      node.textContent=song;
+      node.dataset.author=author;
+      node.dataset.song=song;
+      nodeWrap.appendChild(node);
+      if(i<list.length-1){
+        const arrow=document.createElement("div");
+        arrow.className="arrow";
+        arrow.textContent="→";
+        nodeWrap.appendChild(arrow);
+      }
+    });
+    block.appendChild(nodeWrap);
+    visuals.appendChild(block);
+  }
+}
+
+// sleep helper
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+// add song
+document.getElementById("addBtn").onclick=()=>{
+  const song=document.getElementById("songInput").value.trim();
+  const author=document.getElementById("authorInput").value.trim();
+  if(!song||!author)return alert("Enter both song and author name!");
+  if(!hashTable[author])hashTable[author]=new LinkedList();
+  hashTable[author].insertTail(song);
+  renderVisuals();
+  log(`🎵 Added "${song}" under ${author}`);
+  document.getElementById("songInput").value="";
+  document.getElementById("authorInput").value="";
+};
+
+// play one author’s songs
+async function playAuthor(author){
+  const list=hashTable[author]?.toArray();
+  if(!list||!list.length){alert("No songs for "+author);return;}
+  log(`▶ Playing ${author}'s songs...`);
+  for(const song of list){
+    const node=document.querySelector(`.node[data-author='${author}'][data-song='${song}']`);
+    node.classList.add("playing");
+    log(`🎶 Now Playing: "${song}" by ${author}`);
+    await sleep(2000);
+    node.classList.remove("playing");
+  }
+  log(`✅ Finished ${author}'s playlist.`);
+}
+
+// play all authors sequentially
+async function playAll(){
+  for(const author of Object.keys(hashTable)){
+    await playAuthor(author);
+  }
+  log("🎧 All authors’ playlists completed.");
+}
+
+document.getElementById("playAuthorBtn").onclick=()=>{
+  const author=document.getElementById("authorInput").value.trim();
+  if(!author)return alert("Enter author name to play!");
+  playAuthor(author);
+};
+document.getElementById("playAllBtn").onclick=()=>playAll();
+document.getElementById("resetBtn").onclick=()=>{
+  for(const k in hashTable)delete hashTable[k];
+  visuals.innerHTML="";
+  log("🌀 Playlist reset.");
+};
+
+// demo data
+hashTable["Ilayaraja"]=new LinkedList();
+hashTable["Ilayaraja"].insertTail("Thendrale");
+hashTable["Ilayaraja"].insertTail("En Iniya Pon Nilave");
+hashTable["SPB"]=new LinkedList();
+hashTable["SPB"].insertTail("Mannil Indha Kaadhal");
+hashTable["SPB"].insertTail("Pudhu Vellai Mazhai");
+renderVisuals();
+log("🎼 Demo authors: Ilayaraja, SPB");
+</script>
+</body>
+</html>
